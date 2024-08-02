@@ -17,6 +17,10 @@ type EchoHandler struct {
 	closing    atomic.Boolean
 }
 
+func MakeHandler() *EchoHandler {
+	return &EchoHandler{}
+}
+
 type EchoClient struct {
 	Conn    net.Conn
 	Waiting wait.Wait
