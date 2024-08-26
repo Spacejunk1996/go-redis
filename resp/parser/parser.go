@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/Spacejunk1996/go-redis/interface/resp"
 	"io"
+	"strconv"
 )
 
 type Payload struct {
@@ -60,4 +61,45 @@ func readLine(bufReader *bufio.ReadWriter, state *readState) ([]byte, bool, erro
 	}
 	return msg, false, nil
 
+}
+
+func parseMultiBulkHeader(msg []byte, state *readState) error {
+	var err error
+	var expectedLine uint64
+	expectedLine, err = strconv.ParseUint(string(msg[1:len(msg)-2]), 10, 32)
+	if err != nil {
+		return errors.New("protocol error: " + string(msg))
+	}
+	if expectedLine == 0 {
+		state.expectedArgCount = 0
+		return nil
+	} else if expectedLine > 0 {
+		state.msgType = msg[0]
+		state.readingMultiLine = true
+		state.expectedArgCount = int(expectedLine)
+		state.args = make([][]byte, 0, expectedLine)
+		return nil
+	} else {
+		return errors.New("protocol error: " + string(msg))
+	}
+}
+
+// $4\r\nPING\r\n
+func parseBulkHeader(msg []byte, state *readState) error {
+	var err error
+	state.bulkLen, err = strconv.ParseInt(string(msg[1:len(msg)-2]), 10, 64)
+	if err != nil {
+		return errors.New("protocol error: " + string(msg))
+	}
+	if state.bulkLen == -1 {
+		return nil
+	} else if state.bulkLen > 0 {
+		state.msgType = msg[0]
+		state.readingMultiLine = true
+		state.expectedArgCount = 1
+		state.args = make([][]byte, 0, 1)
+		return nil
+	} else {
+		return errors.New("protocol error: " + string(msg))
+	}
 }
